@@ -6,15 +6,15 @@ import { QRCodeSVG } from 'qrcode.react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Brand } from './Brand';
 import { GameCard } from './GameCard';
-import { getCard, TOTAL_CARDS } from '@/data/questions';
+import { getCard } from '@/data/questions';
 import { ensureGuest, prettyError } from '@/lib/supabase';
 import { inviteUrl, rpc, type RoomState } from '@/lib/game';
 export function GameRoom({roomCode}:{roomCode:string}){
  const [client,setClient]=useState<SupabaseClient|null>(null);const [state,setState]=useState<RoomState|null>(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[copied,setCopied]=useState(false),[qr,setQr]=useState(false),[online,setOnline]=useState(1),[disconnected,setDisconnected]=useState(false);
  const [cardId,setCardId]=useState<string|null>(null);const [flipping,setFlipping]=useState(false);
- const requestGuard=useRef(false);const requestEpoch=useRef(0);const currentCycle=useRef<number|null>(null);
- const refresh=useCallback(async(c:SupabaseClient,withCard=true)=>{const snapshot=await rpc<RoomState>(c,'get_room_state',{p_code:roomCode});setState(snapshot);if(currentCycle.current!==null&&currentCycle.current!==snapshot.cycle){requestEpoch.current++;setCardId(null);setFlipping(false);}currentCycle.current=snapshot.cycle;if(withCard)setCardId(snapshot.current_card);setDisconnected(false);return snapshot;},[roomCode]);
+ const requestGuard=useRef(false);const requestEpoch=useRef(0);const pendingRequest=useRef<string|null>(null);
+ const refresh=useCallback(async(c:SupabaseClient,withCard=true)=>{const snapshot=await rpc<RoomState>(c,'get_room_state',{p_code:roomCode});setState(snapshot);if(withCard)setCardId(snapshot.current_card);setDisconnected(false);return snapshot;},[roomCode]);
  useEffect(()=>{let cancelled=false;let c:SupabaseClient|null=null;async function init(){try{c=await ensureGuest();if(cancelled)return;setClient(c);try{await rpc(c,'join_room',{p_code:roomCode});}catch(e){throw e;}if(cancelled)return;await refresh(c);if(!cancelled)setLoading(false)}catch(e){if(!cancelled){setError(prettyError(e));setLoading(false)}}}init();return()=>{cancelled=true}},[roomCode,refresh]);
  useEffect(()=>{if(!client||!state)return;let active=true;const channel=client.channel(`presence-${roomCode}`,{config:{presence:{key:crypto.randomUUID()}}});
  channel.on('presence',{event:'sync'},()=>{if(active)setOnline(Math.max(1,Object.keys(channel.presenceState()).length))});
@@ -23,14 +23,14 @@ export function GameRoom({roomCode}:{roomCode:string}){
  const poll=setInterval(()=>{if(active)refresh(client,false).catch(()=>setDisconnected(true))},10000);
  const onVisible=()=>{if(document.visibilityState==='visible'&&active)refresh(client,true).catch(()=>setDisconnected(true))};document.addEventListener('visibilitychange',onVisible);
  return()=>{active=false;clearInterval(poll);document.removeEventListener('visibilitychange',onVisible);client.removeChannel(channel);};},[client,roomCode,refresh,Boolean(state)]);
- async function draw(){if(!client||!state||requestGuard.current)return;requestGuard.current=true;setBusy(true);setError('');const epoch=++requestEpoch.current;const oldCycle=state.cycle;
- try {const id=await rpc<string|null>(client,'draw_card',{p_code:roomCode,p_cycle:oldCycle});if(epoch!==requestEpoch.current)return;if(id){setFlipping(true);setCardId(null);setTimeout(()=>{if(epoch===requestEpoch.current){setCardId(id);setFlipping(false)}},280)}await refresh(client,false)}catch(e){if(epoch===requestEpoch.current){setError(prettyError(e));refresh(client,true).catch(()=>{})}}finally{requestGuard.current=false;setBusy(false)}}
+ async function draw(){if(!client||!state||requestGuard.current)return;requestGuard.current=true;setBusy(true);setError('');const epoch=++requestEpoch.current;const requestId=pendingRequest.current ?? crypto.randomUUID();pendingRequest.current=requestId;
+ try {const id=await rpc<string|null>(client,'draw_card',{p_code:roomCode,p_request_id:requestId});if(epoch!==requestEpoch.current)return;pendingRequest.current=null;if(id){setFlipping(true);setCardId(null);setTimeout(()=>{if(epoch===requestEpoch.current){setCardId(id);setFlipping(false)}},280)}await refresh(client,false)}catch(e){if(epoch===requestEpoch.current){setError(prettyError(e));refresh(client,true).catch(()=>{})}}finally{requestGuard.current=false;setBusy(false)}}
  async function reset(){if(!client||!state)return;if(!window.confirm('Đặt lại toàn bộ 15 thẻ cho tất cả thành viên?'))return;setBusy(true);setError('');try{await rpc(client,'reset_room',{p_code:roomCode});requestEpoch.current++;setCardId(null);await refresh(client,true)}catch(e){setError(prettyError(e))}finally{setBusy(false)}}
  async function copy(){try{await navigator.clipboard.writeText(inviteUrl(roomCode));setCopied(true);setTimeout(()=>setCopied(false),2000)}catch{setError('Không thể sao chép. Vui lòng copy đường dẫn từ thanh địa chỉ.')}}
  async function share(){if(navigator.share){try{await navigator.share({title:'Untold',url:inviteUrl(roomCode)})}catch{}}else await copy()}
  if(loading)return <div className="min-h-screen flex items-center justify-center text-neutral-500" role="status">Đang kết nối phòng chơi...</div>;
  if(!state)return <div className="min-h-screen flex flex-col gap-5 items-center justify-center p-6 text-center"><h1 className="text-2xl font-bold">Không thể vào phòng</h1><p role="alert" className="text-red-600 max-w-md">{error}</p><Link href="/" className="btn">Về trang chủ</Link></div>;
- const complete=state.count===TOTAL_CARDS;
+ 
  return <main className="site-shell min-h-screen">
    <header className="site-header flex justify-between gap-4 items-center">
      <Brand/><Link href="/" className="room-aux inline-flex items-center gap-2"><ArrowLeft size={17}/> Leave Room</Link>
@@ -56,17 +56,11 @@ export function GameRoom({roomCode}:{roomCode:string}){
      <section className="room-main">
        <div className="game-card-wrap"><GameCard card={cardId?getCard(cardId):null}/></div>
        <div className="game-action">
-         <button className="btn primary flex items-center justify-center gap-3" onClick={draw} disabled={busy||complete||flipping}>
-           {busy||flipping?'Đang bốc thẻ...':complete?'Đã hết thẻ':cardId?'Draw Another Card →':'Draw Card →'}
+         <button className="btn primary flex items-center justify-center gap-3" onClick={draw} disabled={busy||flipping}>
+           {busy||flipping?'Đang bốc thẻ...':cardId?'Draw Another Card →':'Draw Card →'}
          </button>
          {error&&<p role="alert" className="error-text text-center mt-4">{error}</p>}
        </div>
-       {complete&&<div className="clay-surface clay-complete">
-         <div className="text-3xl mb-2" aria-hidden="true">✳</div>
-         <p className="font-bold">Bạn đã khám phá hết tất cả thẻ bài!</p>
-         <p className="text-sm mt-2">All cards have been discovered! · 15/15</p>
-         {state.host&&<button className="mt-5 btn secondary flex items-center justify-center gap-2 w-full" onClick={reset} disabled={busy}><RotateCcw size={17}/> Reset Deck</button>}
-       </div>}
      </section>
      <aside className="room-help">
        <div className="clay-surface how-to-play">
