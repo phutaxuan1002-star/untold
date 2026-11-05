@@ -1,8 +1,22 @@
 "use client";
 import { motion, useReducedMotion } from 'motion/react';
 import type { Card } from '@/data/questions';
-import { CATEGORY } from '@/data/questions';
 export function GameCard({card}:{card:Card|null}){
- const reduce=useReducedMotion();const category=card?CATEGORY[card.category]:null;
- return <div className="flip-perspective w-full max-w-[min(76vw,335px)] mx-auto aspect-[2/3]" aria-live="polite"><motion.div className="flip-inner" animate={{rotateY:card?180:0}} transition={{duration:reduce?0:.65,ease:[.2,.8,.2,1]}}><div className="face bg-white border border-neutral-200 rounded-[26px] card-shadow p-7 flex flex-col justify-between items-center"><span className="self-start text-xs tracking-[.25em] text-neutral-400">DISCOVER / CONNECT</span><div className="w-28 h-28 rounded-full border border-[#d4d0ff] flex justify-center items-center"><div className="border-[3px] border-[#635bff] rounded-[22px] rotate-45 w-20 h-20 flex justify-center items-center"><span className="text-5xl text-[#635bff] -rotate-45">✳</span></div></div><div className="text-center"><p className="font-black tracking-[-.04em] text-2xl">UNTOLD</p><p className="text-[10px] text-neutral-400 tracking-[.18em] mt-3">DISCOVER YOUR POTENTIAL</p></div></div><div className="face front bg-white border border-neutral-200 rounded-[26px] card-shadow p-6 sm:p-7 flex flex-col justify-between"><div className="flex justify-between gap-3 items-center"><span className="font-semibold text-[10px] sm:text-xs uppercase tracking-[.06em]" style={{color:category?.color}}>{category?.label}</span><span className="text-xs text-neutral-400">{card?.id}</span></div><div className="flex-1 flex flex-col justify-center gap-5"><div className="h-1 w-11 rounded-full" style={{background:category?.color}}/><h2 className="font-semibold tracking-[-.035em] text-[clamp(1.15rem,4.7vw,1.7rem)] leading-[1.3]">{card?.questionVi}</h2><div className="h-px w-full bg-neutral-200"/><p lang="en" className="text-neutral-500 text-[clamp(.82rem,3vw,1rem)] leading-relaxed">{card?.questionEn}</p></div><div className="flex justify-between items-center text-[10px] tracking-widest text-neutral-400"><span>ONE QUESTION. NEW PERSPECTIVES.</span><span className="text-xl" style={{color:category?.color}}>✳</span></div></div></motion.div></div>
+  const reduce=useReducedMotion();
+  return <div className="flip-perspective w-full mx-auto aspect-[2/3]" aria-live="polite">
+    <motion.div className="flip-inner" animate={{rotateY:card?180:0}} transition={{duration:reduce?0:.65,ease:[.2,.8,.2,1]}}>
+      <div className="face card-back flex flex-col justify-center items-center" aria-hidden={Boolean(card)}>
+        <div className="card-back-emblem"><span>✳</span></div><p className="card-back-wordmark">UNTOLD</p>
+      </div>
+      <div className="face front question-card flex flex-col justify-center" aria-hidden={!card}>
+        <div className="question-content">
+          <div className="question-mark" aria-hidden="true">✳</div>
+          <h2 lang="vi" className="question-vi">{card?.questionVi}</h2>
+          <div className="question-divider"/>
+          <p lang="en" className="question-en">{card?.questionEn}</p>
+        </div>
+        <span className="question-corner" aria-hidden="true">✳</span>
+      </div>
+    </motion.div>
+  </div>;
 }

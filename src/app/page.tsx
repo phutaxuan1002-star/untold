@@ -1,15 +1,40 @@
 "use client";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Sparkles, Users, Layers, Globe2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { Brand } from '@/components/Brand';
 import { ensureGuest, prettyError } from '@/lib/supabase';
 import { normalizeRoomCode, rpc } from '@/lib/game';
 export default function Home() {
-  const router=useRouter();const [mode,setMode]=useState<'home'|'join'>('home');
-  const [code,setCode]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+  const router=useRouter();
+  const [mode,setMode]=useState<'home'|'join'>('home');
+  const [code,setCode]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
   async function create(){setBusy(true);setError('');try{const c=await ensureGuest();const room=await rpc<string>(c,'create_room');router.push(`/room/${room}`)}catch(e){setError(prettyError(e))}finally{setBusy(false)}}
   async function join(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const c=await ensureGuest();const room=await rpc<string>(c,'join_room',{p_code:normalizeRoomCode(code)});router.push(`/room/${room}`)}catch(e){setError(prettyError(e))}finally{setBusy(false)}}
-  return <main className="min-h-screen max-w-6xl mx-auto px-5 sm:px-10"><header className="py-8"><Brand/></header><section className="grid lg:grid-cols-2 gap-12 items-center py-12 lg:py-24"><div className="max-w-xl"><div className="inline-flex items-center gap-2 text-[#635bff] text-sm font-semibold mb-7"><Sparkles size={17}/> A LITTLE CURIOSITY GOES A LONG WAY</div><h1 className="font-extrabold tracking-[-.075em] text-6xl sm:text-7xl lg:text-[5.4rem] leading-[1.02]">Stories <span className="text-[#635bff]">untold.</span><br/>Connections<br/>unfold.</h1><p className="mt-7 text-xl text-neutral-600 leading-relaxed">Discover the people behind the team.</p><p className="mt-2 text-base text-neutral-500">Mỗi câu hỏi, một góc nhìn mới về nhau.</p><div className="mt-10 flex flex-col sm:flex-row gap-3">{mode==='home'?<><button disabled={busy} onClick={create} className="btn flex items-center justify-center gap-3">{busy?'Đang tạo phòng...':'Create Room'}<ArrowRight size={19}/></button><button disabled={busy} onClick={()=>setMode('join')} className="btn secondary">Join Room</button></>:<form className="flex flex-col sm:flex-row gap-3 w-full" onSubmit={join}><input aria-label="Room code" autoFocus required maxLength={8} value={code} onChange={e=>setCode(normalizeRoomCode(e.target.value))} placeholder="ROOM CODE" className="min-w-0 w-full sm:w-48 px-4 rounded-xl border border-neutral-300 uppercase tracking-[.2em] bg-white h-[52px]"/><button disabled={busy||!code} className="btn">{busy?'Đang vào...':'Join →'}</button><button type="button" className="text-sm text-neutral-500 px-2" onClick={()=>setMode('home')}>Back</button></form>}</div>{error&&<p role="alert" className="text-red-600 mt-4 text-sm">{error}</p>}<div className="mt-12 flex flex-wrap gap-x-7 gap-y-4 text-sm text-neutral-500"><span className="flex gap-2 items-center"><Layers size={17}/>15 questions</span><span className="flex gap-2 items-center"><Globe2 size={17}/>5 categories</span><span className="flex gap-2 items-center"><Users size={17}/>Multiplayer · No sign-up</span></div></div><div className="flex justify-center items-center py-8"><motion.div initial={{rotate:-8,y:20,opacity:0}} animate={{rotate:-7,y:0,opacity:1}} transition={{duration:.9}} className="relative w-[min(78vw,360px)] aspect-[2/3] bg-white border border-neutral-200 rounded-[28px] card-shadow flex flex-col items-center justify-between p-9"><span className="self-start text-xs tracking-[.3em] text-neutral-400">01 / 15</span><div className="relative w-32 h-32 rounded-full border border-[#635bff]/30 flex items-center justify-center"><div className="w-20 h-20 border-[2px] border-[#635bff] rotate-45 rounded-2xl flex items-center justify-center"><span className="text-[#635bff] text-5xl -rotate-45">✳</span></div></div><div className="text-center"><p className="font-black text-3xl tracking-[-.05em]">UNTOLD</p><p className="mt-3 text-xs text-neutral-400 tracking-widest">DISCOVER YOUR POTENTIAL</p></div><div className="absolute -z-10 w-full h-full bg-[#d8d5ff] rounded-[28px] top-6 left-6 rotate-6"/></motion.div></div></section><footer className="py-8 text-sm text-neutral-400 border-t border-neutral-200">Good conversations start with one question.</footer></main>;
+  return <main className="site-shell min-h-screen">
+    <header className="site-header"><Brand/></header>
+    <section className="clay-hero" aria-label="Welcome to Untold">
+      <div className="hero-copy">
+        <div className="eyebrow flex items-center gap-2"><Sparkles size={18}/> A LITTLE CURIOSITY GOES A LONG WAY</div>
+        <h1 className="hero-title">Stories <span>untold.</span><br/>Connections<br/>unfold.</h1>
+        <p className="hero-subtitle">Discover the people behind the team.</p>
+        {mode==='home' ? <div className="hero-actions">
+          <button disabled={busy} onClick={create} className="btn primary flex items-center justify-center gap-3">{busy?'Đang tạo phòng...':'Create Room'} <ArrowRight size={19}/></button>
+          <button disabled={busy} onClick={()=>setMode('join')} className="btn secondary">Join Room</button>
+        </div> : <form className="join-form" onSubmit={join}>
+          <input aria-label="Room code" autoFocus required maxLength={8} value={code} onChange={e=>setCode(normalizeRoomCode(e.target.value))} placeholder="ROOM CODE" className="clay-input"/>
+          <button disabled={busy||!code} className="btn primary">{busy?'Đang vào...':'Join →'}</button>
+          <button type="button" className="text-sm font-semibold underline underline-offset-4" onClick={()=>setMode('home')}>Back</button>
+        </form>}
+        {error&&<p role="alert" className="error-text mt-5">{error}</p>}
+      </div>
+      <div className="hero-sculpture" aria-hidden="true">
+        <div className="clay-blob clay-blob-mint"/><div className="clay-blob clay-blob-yellow"/><div className="clay-blob clay-blob-blue"/>
+        <div className="hero-card-shadow"/>
+        <div className="hero-card"><div className="hero-card-emblem"><span>✳</span></div><div className="hero-card-wordmark">UNTOLD</div></div>
+      </div>
+    </section>
+  </main>;
 }

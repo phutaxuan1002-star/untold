@@ -1,8 +1,7 @@
 "use client";
 import { useEffect,useState,useCallback,useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft,Copy,Check,Share2,RotateCcw,Users,WifiOff, X, QrCode } from 'lucide-react';
+import { ArrowLeft,Copy,Check,Share2,RotateCcw,Users,WifiOff,QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Brand } from './Brand';
@@ -11,7 +10,7 @@ import { getCard, TOTAL_CARDS } from '@/data/questions';
 import { ensureGuest, prettyError } from '@/lib/supabase';
 import { inviteUrl, rpc, type RoomState } from '@/lib/game';
 export function GameRoom({roomCode}:{roomCode:string}){
- const router=useRouter();const [client,setClient]=useState<SupabaseClient|null>(null);const [state,setState]=useState<RoomState|null>(null);
+ const [client,setClient]=useState<SupabaseClient|null>(null);const [state,setState]=useState<RoomState|null>(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[copied,setCopied]=useState(false),[qr,setQr]=useState(false),[online,setOnline]=useState(1),[disconnected,setDisconnected]=useState(false);
  const [cardId,setCardId]=useState<string|null>(null);const [flipping,setFlipping]=useState(false);
  const requestGuard=useRef(false);const requestEpoch=useRef(0);const currentCycle=useRef<number|null>(null);
@@ -32,9 +31,50 @@ export function GameRoom({roomCode}:{roomCode:string}){
  if(loading)return <div className="min-h-screen flex items-center justify-center text-neutral-500" role="status">Đang kết nối phòng chơi...</div>;
  if(!state)return <div className="min-h-screen flex flex-col gap-5 items-center justify-center p-6 text-center"><h1 className="text-2xl font-bold">Không thể vào phòng</h1><p role="alert" className="text-red-600 max-w-md">{error}</p><Link href="/" className="btn">Về trang chủ</Link></div>;
  const complete=state.count===TOTAL_CARDS;
- return <main className="max-w-6xl mx-auto min-h-screen px-4 sm:px-8 pb-10"><header className="flex justify-between gap-4 items-center py-5 sm:py-7"><Brand/><Link href="/" className="flex items-center gap-2 text-sm text-neutral-500 hover:text-black"><ArrowLeft size={17}/> <span className="hidden sm:inline">Leave Room</span><span className="sm:hidden">Exit</span></Link></header>
- <section className="grid lg:grid-cols-[260px_1fr_260px] gap-8 lg:gap-5 mt-4 items-start"><aside className="lg:pt-16 order-2 lg:order-1"><div className="rounded-2xl bg-white border border-neutral-200 p-5"><p className="text-xs uppercase tracking-widest text-neutral-400 mb-3">YOUR ROOM</p><div className="flex items-center justify-between"><span className="font-bold text-2xl tracking-[.12em]">{roomCode}</span><button aria-label="Copy invite link" onClick={copy} className="p-2 hover:bg-neutral-100 rounded-lg">{copied?<Check size={19} className="text-green-600"/>:<Copy size={19}/>}</button></div><p className="text-xs text-neutral-500 mt-2">Share this code with your team.</p><div className="flex gap-2 mt-4"><button onClick={share} className="text-sm border border-neutral-200 rounded-lg py-2 px-3 flex gap-2 items-center"><Share2 size={15}/> Share</button><button onClick={()=>setQr(!qr)} className="text-sm border border-neutral-200 rounded-lg py-2 px-3 flex gap-2 items-center"><QrCode size={15}/> QR</button></div>{qr&&<div className="mt-4 flex justify-center bg-white p-2"><QRCodeSVG value={inviteUrl(roomCode)} size={155}/></div>}</div><div className="mt-4 flex items-center gap-2 text-neutral-500 text-sm px-2"><Users size={16}/> {online} participant{online!==1?'s':''} connected</div>{disconnected&&<div className="mt-3 text-amber-700 flex items-center gap-2 text-sm"><WifiOff size={16}/> Đang kết nối lại...</div>}</aside>
- <section className="order-1 lg:order-2 flex flex-col items-center"><div className="text-center mb-6"><div className="inline-block uppercase tracking-[.2em] text-[11px] text-[#635bff] font-bold mb-2">THE CONVERSATION STARTS HERE</div><h1 className="text-3xl font-bold tracking-[-.04em]">Discover your potential.</h1><p className="text-neutral-500 text-sm mt-2">Một câu hỏi, một kết nối mới.</p></div><div className="w-full max-w-[335px]"><GameCard card={cardId?getCard(cardId):null}/></div><div className="w-full max-w-[335px] mt-7"><button className="btn w-full flex items-center justify-center gap-3" onClick={draw} disabled={busy||complete||flipping}>{busy||flipping?'Đang bốc thẻ...':complete?'Đã hết thẻ':cardId?'Draw Another Card →':'Draw Card →'}</button><p className="text-center text-sm text-neutral-400 mt-3">No turns. Just good conversations.</p>{error&&<p role="alert" className="text-center text-red-600 mt-3 text-sm">{error}</p>}</div>{complete&&<div className="mt-5 rounded-2xl bg-white border border-neutral-200 p-5 text-center w-full max-w-[335px]"><div className="text-3xl mb-2">✳</div><p className="font-bold">Bạn đã khám phá hết tất cả thẻ bài!</p><p className="text-neutral-500 text-sm mt-2">All cards have been discovered! · 15/15</p>{state.host&&<button className="mt-4 btn secondary flex items-center justify-center gap-2 w-full" onClick={reset} disabled={busy}><RotateCcw size={17}/> Reset Deck</button>}</div>}</section>
- <aside className="lg:pt-16 order-3"><div className="p-5 rounded-2xl border border-neutral-200 bg-white"><div className="flex justify-between items-center text-sm"><span className="font-semibold">Deck progress</span><span className="tabular-nums text-neutral-500">{state.count}/{TOTAL_CARDS}</span></div><div role="progressbar" aria-valuenow={state.count} aria-valuemin={0} aria-valuemax={TOTAL_CARDS} aria-label="Cards discovered" className="w-full bg-neutral-100 h-2 rounded-full overflow-hidden mt-4"><div className="h-full bg-[#635bff] rounded-full transition-all" style={{width:`${state.count/TOTAL_CARDS*100}%`}}/></div><p className="text-xs text-neutral-500 mt-3">{TOTAL_CARDS-state.count} cards waiting to be discovered.</p></div><div className="mt-5 px-2"><p className="text-sm font-semibold mb-3">HOW TO PLAY</p><ol className="list-decimal pl-4 space-y-3 text-sm text-neutral-500"><li>Share your room code with the team.</li><li>Everyone can draw their own random card.</li><li>Read your question and start talking.</li></ol></div>{state.host&&<button onClick={reset} disabled={busy} className="text-sm text-neutral-500 hover:text-black px-2 mt-7 flex items-center gap-2"><RotateCcw size={15}/> Reset shared deck</button>}</aside></section>
- <footer className="pt-10 mt-14 text-neutral-400 text-xs text-center border-t border-neutral-200">UNTOLD · Made for meaningful conversations</footer></main>
+ return <main className="site-shell min-h-screen">
+   <header className="site-header flex justify-between gap-4 items-center">
+     <Brand/><Link href="/" className="room-aux inline-flex items-center gap-2"><ArrowLeft size={17}/> Leave Room</Link>
+   </header>
+   <section className="room-layout">
+     <aside className="room-side">
+       <div className="clay-surface room-info">
+         <p className="room-label mb-3">YOUR ROOM</p>
+         <div className="flex items-center justify-between gap-2">
+           <span className="room-code">{roomCode}</span>
+           <button aria-label="Copy invite link" onClick={copy} className="small-clay-button p-3">{copied?<Check size={19}/>:<Copy size={19}/>}</button>
+         </div>
+         <p className="text-sm mt-3 opacity-80">Share this code with your team.</p>
+         <div className="flex gap-2 mt-5 flex-wrap">
+           <button onClick={share} className="small-clay-button text-sm"><Share2 size={15}/> Share</button>
+           <button onClick={()=>setQr(!qr)} aria-expanded={qr} className="small-clay-button text-sm"><QrCode size={15}/> QR</button>
+         </div>
+         {qr&&<div className="mt-5 flex justify-center rounded-[25px] bg-[#fffdf7] p-5"><QRCodeSVG value={inviteUrl(roomCode)} size={155}/></div>}
+       </div>
+       <div className="mt-5 flex items-center gap-2 room-aux px-3"><Users size={17}/> {online} participant{online!==1?'s':''} connected</div>
+       {disconnected&&<div className="mt-3 text-amber-800 flex items-center gap-2 text-sm px-3"><WifiOff size={16}/> Đang kết nối lại...</div>}
+     </aside>
+     <section className="room-main">
+       <div className="game-card-wrap"><GameCard card={cardId?getCard(cardId):null}/></div>
+       <div className="game-action">
+         <button className="btn primary flex items-center justify-center gap-3" onClick={draw} disabled={busy||complete||flipping}>
+           {busy||flipping?'Đang bốc thẻ...':complete?'Đã hết thẻ':cardId?'Draw Another Card →':'Draw Card →'}
+         </button>
+         {error&&<p role="alert" className="error-text text-center mt-4">{error}</p>}
+       </div>
+       {complete&&<div className="clay-surface clay-complete">
+         <div className="text-3xl mb-2" aria-hidden="true">✳</div>
+         <p className="font-bold">Bạn đã khám phá hết tất cả thẻ bài!</p>
+         <p className="text-sm mt-2">All cards have been discovered! · 15/15</p>
+         {state.host&&<button className="mt-5 btn secondary flex items-center justify-center gap-2 w-full" onClick={reset} disabled={busy}><RotateCcw size={17}/> Reset Deck</button>}
+       </div>}
+     </section>
+     <aside className="room-help">
+       <div className="clay-surface how-to-play">
+         <p className="text-sm font-extrabold">HOW TO PLAY</p>
+         <ol className="list-decimal"><li>Share your room code with the team.</li><li>Everyone can draw their own random card.</li><li>Read your question and start talking.</li></ol>
+       </div>
+       {state.host&&<button onClick={reset} disabled={busy} className="room-aux px-2 mt-6 flex items-center gap-2"><RotateCcw size={15}/> Reset shared deck</button>}
+     </aside>
+   </section>
+ </main>;
 }
